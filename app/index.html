@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Němčina A1 — Příprava na zkoušku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Fraunces:wght@600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -24,7 +27,29 @@
   </div>
 </header>
 
-<main class="wrap" id="app"></main>
+<div class="layout">
+  <main id="app"></main>
+  <aside class="rail" id="rail">
+    <div class="widget">
+      <h4>Tvůj pokrok</h4>
+      <div class="rail-stat"><span>📚 Slovíčka</span><b id="rail-vocab">— / —</b></div>
+      <div class="bar"><div class="bar-fill" id="rail-vocab-bar" style="width:0%"></div></div>
+      <div class="rail-stat"><span>🔥 Drill</span><b id="rail-drill">— / —</b></div>
+      <div class="bar"><div class="bar-fill" id="rail-drill-bar" style="width:0%"></div></div>
+      <div class="rail-stat"><span>🎯 Kvízy</span><b id="rail-quizzes">0</b></div>
+      <div class="rail-stat"><span>🏆 Best skóre</span><b id="rail-best">0 / 0</b></div>
+    </div>
+    <div class="widget">
+      <h4>Klávesové zkratky</h4>
+      <div class="rail-kbd"><span>Otoč kartu</span><kbd>Mezera</kbd></div>
+      <div class="rail-kbd"><span>Předchozí / Další</span><kbd>← →</kbd></div>
+      <div class="rail-kbd"><span>Umím (kartička)</span><kbd>K</kbd></div>
+      <div class="rail-kbd"><span>Výslovnost</span><kbd>S</kbd></div>
+      <div class="rail-kbd"><span>Drill odpověď</span><kbd>1 2 3</kbd></div>
+      <div class="rail-kbd"><span>Další otázka</span><kbd>Enter</kbd></div>
+    </div>
+  </aside>
+</div>
 
 <footer>
   <div class="wrap">

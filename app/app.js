@@ -2,7 +2,7 @@
 const STORE_KEY = "nemcina-a1-progress-v1";
 const state = load() || { known: {}, quiz: { best: 0, done: 0 }, flash: { seen: 0 }, drill: { mastered: {}, streaks: {}, attempts: 0, correct: 0, sessions: 0 } };
 if (!state.drill) state.drill = { mastered: {}, streaks: {}, attempts: 0, correct: 0, sessions: 0 };
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); if (typeof renderRail === "function") renderRail(); }
 function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return null; } }
 
 const app = document.getElementById("app");
@@ -23,6 +23,7 @@ document.getElementById("resetBtn").addEventListener("click", () => {
 });
 
 function render(view) {
+  renderRail();
   switch (view) {
     case "home": return renderHome();
     case "vocab": return renderVocab();
@@ -34,6 +35,24 @@ function render(view) {
     case "drill": return renderDrill();
     case "progress": return renderProgress();
   }
+}
+
+// ==== Right rail (sticky progress widget) ====
+function renderRail() {
+  const rail = document.getElementById("rail");
+  if (!rail) return;
+  const total = allWords().length;
+  const known = Object.values(state.known).filter(Boolean).length;
+  const drillTotal = (typeof PAST_TESTS !== "undefined") ? PAST_TESTS.length : 0;
+  const drillMastered = Object.keys(state.drill.mastered).filter(k => state.drill.mastered[k]).length;
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  const setW = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct + "%"; };
+  set("rail-vocab", `${known} / ${total}`);
+  setW("rail-vocab-bar", total ? known/total*100 : 0);
+  set("rail-drill", `${drillMastered} / ${drillTotal}`);
+  setW("rail-drill-bar", drillTotal ? drillMastered/drillTotal*100 : 0);
+  set("rail-quizzes", state.quiz.done);
+  set("rail-best", `${state.quiz.best} / ${(typeof QUIZ !== "undefined") ? QUIZ.length : 0}`);
 }
 
 // ==== Helpers ====
@@ -299,7 +318,7 @@ function nextQuiz() {
     app.innerHTML = `
       <h2>🎯 Konec kvízu</h2>
       <div class="card">
-        <h3 style="color:${quizScore >= quizDeck.length*0.8 ? 'var(--ok)' : 'var(--accent)'}">Skóre: ${quizScore} / ${quizDeck.length}</h3>
+        <h3 style="color:${quizScore >= quizDeck.length*0.8 ? 'var(--ok)' : 'var(--gold-shade)'}">Skóre: ${quizScore} / ${quizDeck.length}</h3>
         <p>${quizScore >= quizDeck.length*0.8 ? '🎉 Výborně! Připraven/a na zkoušku.' : quizScore >= quizDeck.length*0.5 ? '👍 Slušné. Projdi si ještě gramatiku.' : '📚 Zkus si projít sekci Gramatika a zkus to znovu.'}</p>
         <button class="primary" id="quizAgain">Znovu</button>
       </div>
@@ -330,7 +349,7 @@ function renderExam() {
     app.innerHTML = `
       <h2>📝 Výsledek zkoušky</h2>
       <div class="card">
-        <h3 style="color:${pct>=80?'var(--ok)':pct>=50?'var(--accent)':'var(--err)'}">${examScore} / ${examDeck.length} (${pct} %)</h3>
+        <h3 style="color:${pct>=80?'var(--ok)':pct>=50?'var(--gold-shade)':'var(--err)'}">${examScore} / ${examDeck.length} (${pct} %)</h3>
         <p>${pct>=80?'🎉 Výborně, můžeš jít na zkoušku!':pct>=50?'👍 Slušné, ještě se podívej na chyby.':'📚 Procvič slovíčka a zkus to znovu.'}</p>
         <button class="primary" id="examAgain">Nová zkouška (20 slov)</button>
       </div>
@@ -344,7 +363,7 @@ function renderExam() {
     <div class="quiz-prog">Slovo ${examI+1} / ${examDeck.length} · Skóre: <b>${examScore}</b></div>
     <div class="card">
       <p style="color:var(--muted); margin-bottom:4px">Přelož do němčiny:</p>
-      <h3 style="font-size:24px; color:#fff">${w.cs}</h3>
+      <h3 style="font-size:24px; color:var(--strong); text-transform:none; letter-spacing:-0.2px">${w.cs}</h3>
       <input class="exam-input" id="examInput" placeholder="Napiš německý překlad..." autofocus autocomplete="off">
       <div id="examFeedback"></div>
       <div style="margin-top:10px; display:flex; gap:10px">
@@ -468,9 +487,9 @@ function renderTestOverview() {
         <div class="acc-b">
           <p style="color:var(--muted)">${t.desc}</p>
           ${t.items.map(it => `
-            <div style="margin:12px 0; padding:10px 14px; background:var(--panel-2); border-radius:8px;">
-              <div style="color:#fff; margin-bottom:4px">${it.q}</div>
-              <div style="color:var(--accent)"><b>Vzor:</b> ${it.a}</div>
+            <div style="margin:12px 0; padding:12px 16px; background:var(--bg-soft); border:1px solid var(--border); border-radius:10px;">
+              <div style="color:var(--strong); margin-bottom:4px">${it.q}</div>
+              <div style="color:var(--accent-shade)"><b>Vzor:</b> ${it.a}</div>
             </div>
           `).join("")}
         </div>
@@ -499,7 +518,7 @@ function renderDrill(which, label) {
     <div class="quiz-prog">Příklad ${drillI+1} / ${deck.length} · <span style="color:var(--muted)">Enter = zkontrolovat, ↓ = další</span></div>
     <div class="card">
       <p style="color:var(--muted); margin-bottom:4px">${label}:</p>
-      <h3 style="color:#fff; font-size:20px">${item.q}</h3>
+      <h3 style="color:var(--strong); font-size:20px; text-transform:none; letter-spacing:-0.2px">${item.q}</h3>
       <textarea class="exam-input" id="drillIn" rows="2" placeholder="Napiš větu..." autofocus></textarea>
       <div id="drillFb"></div>
       <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap">
@@ -614,7 +633,7 @@ function renderSimulation() {
       ${simAnswers.map((a, i) => `
         <div class="card" style="padding:14px 18px">
           <div style="color:var(--muted); font-size:13px; margin-bottom:4px">${a.taskTitle}</div>
-          <div style="color:#fff; margin-bottom:6px"><b>Zadání:</b> ${a.q}</div>
+          <div style="color:var(--strong); margin-bottom:6px"><b>Zadání:</b> ${a.q}</div>
           <div style="margin-bottom:6px"><b>Tvá odpověď:</b> ${escapeHtml(a.answer || '(prázdné)')}</div>
           <div style="color:var(--accent)"><b>Vzor:</b> ${a.model}</div>
           ${a.auto ? `<div style="margin-top:4px; color:${a.ok?'var(--ok)':'var(--err)'}; font-size:13px">${a.ok?'✓ správně':'✗ liší se od vzoru'}</div>` : `<div style="margin-top:4px; color:var(--muted); font-size:13px">otevřená úloha</div>`}
@@ -672,7 +691,7 @@ function renderSimStep(body, task, itemIdx, progress, taskProgress, q, model, au
     <div class="quiz-prog">${progress} · <span style="color:var(--muted)">${taskProgress}</span></div>
     <div class="card">
       <h3 style="margin-top:0; color:var(--accent)">${task.t.title}</h3>
-      <p style="color:#fff"><b>Zadání:</b> ${q}</p>
+      <p style="color:var(--strong)"><b>Zadání:</b> ${q}</p>
       <textarea class="exam-input" id="simIn" rows="${rows}" placeholder="Napiš odpověď..." autofocus></textarea>
       <div id="simFb"></div>
       <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap">
@@ -814,17 +833,17 @@ function renderDrill() {
           <button class="primary" data-mode="all">🎯 Všech 119 otázek</button>
           <button class="ghost" data-mode="review" ${masteredCount?'':'disabled'}>📖 Review (${masteredCount} zvládnutých)</button>
         </div>
-        <h4 style="margin:14px 0 8px; color:var(--blue)">Ročník 2024/2025 (60 otázek)</h4>
+        <h4 style="margin:14px 0 8px; color:var(--blue-shade)">Ročník 2024/2025 (60 otázek)</h4>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-          <button class="btn" data-mode="2024" style="background:var(--blue); color:#041024">📘 Celý ročník 2024 (60)</button>
-          <button class="btn" data-mode="A" style="background:var(--blue); color:#041024; opacity:.85">Varianta A (30)</button>
-          <button class="btn" data-mode="B" style="background:#c084fc; color:#1a0a24">Varianta B (30)</button>
+          <button class="btn" data-mode="2024" style="background:var(--blue); color:#fff; box-shadow:0 4px 0 var(--blue-shade)">📘 Celý ročník 2024 (60)</button>
+          <button class="btn" data-mode="A" style="background:var(--blue); color:#fff; box-shadow:0 4px 0 var(--blue-shade); opacity:.85">Varianta A (30)</button>
+          <button class="btn" data-mode="B" style="background:#A560E8; color:#fff; box-shadow:0 4px 0 #7C3FBA">Varianta B (30)</button>
         </div>
-        <h4 style="margin:14px 0 8px; color:var(--accent-2)">Ročník 2023/2024 (59 otázek)</h4>
+        <h4 style="margin:14px 0 8px; color:var(--accent-2-shade)">Ročník 2023/2024 (59 otázek)</h4>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn" data-mode="2023" style="background:var(--accent-2); color:#240a0a">📕 Celý ročník 2023 (59)</button>
-          <button class="btn" data-mode="A23" style="background:var(--accent-2); color:#240a0a; opacity:.85">Varianta A23 (29)</button>
-          <button class="btn" data-mode="B23" style="background:#fb923c; color:#1a0a04">Varianta B23 (30)</button>
+          <button class="btn" data-mode="2023" style="background:var(--accent-2); color:#fff; box-shadow:0 4px 0 var(--accent-2-shade)">📕 Celý ročník 2023 (59)</button>
+          <button class="btn" data-mode="A23" style="background:var(--accent-2); color:#fff; box-shadow:0 4px 0 var(--accent-2-shade); opacity:.85">Varianta A23 (29)</button>
+          <button class="btn" data-mode="B23" style="background:#FB923C; color:#fff; box-shadow:0 4px 0 #C77024">Varianta B23 (30)</button>
         </div>
         <p style="color:var(--muted); margin-top:14px; font-size:13px">💡 Klávesové zkratky: <b>1 / 2 / 3</b> odpověď, <b>Enter</b> = další otázka.</p>
         ${masteredCount ? `<div style="margin-top:14px"><button class="ghost" id="drillReset">🗑️ Resetovat drill pokrok</button></div>` : ''}
@@ -1012,4 +1031,5 @@ document.addEventListener("keydown", e => {
 });
 
 // ==== Init ====
+renderRail();
 renderHome();
