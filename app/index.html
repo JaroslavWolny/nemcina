@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Němčina A1 — Příprava na zkoušku</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>🇩🇪 Němčina A1 — Letní semestr</h1>
+    <nav id="mainNav">
+      <button data-view="home" class="active">Domů</button>
+      <button data-view="vocab">Slovíčka</button>
+      <button data-view="grammar">Gramatika</button>
+      <button data-view="flashcards">Kartičky</button>
+      <button data-view="quiz">Kvíz</button>
+      <button data-view="exam">Zkouška</button>
+      <button data-view="test">Zápočet</button>
+      <button data-view="drill">🔥 Drill testů</button>
+      <button data-view="progress">Pokrok</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<footer>
+  <div class="wrap">
+    <small>Pokrok se ukládá lokálně v prohlížeči (localStorage).</small>
+    <button id="resetBtn" class="ghost">Resetovat pokrok</button>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
