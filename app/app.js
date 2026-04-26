@@ -784,11 +784,21 @@ let drillPDeck = [];          // pole indexů (do PAST_TESTS)
 let drillPI = 0;
 let drillAnswered = false;
 let drillCurrentOpts = [];   // zamíchané možnosti pro aktuální otázku [{text, correct}]
-let drillMode = "all";       // "all" | "A" | "B" | "review"
-let drillSessionStats = { correct: 0, wrong: 0 };
+let drillMode = "all";       // "all" | "A" | "B" | "review" | "quick"
+let drillSessionStats = { correct: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
+let drillSessionMax = null;  // null = neomezeno; číslo = ukončit po N odpovědích
+let drillAutoTimer = null;   // setTimeout handle pro auto-advance
+
+const ENCOURAGE_OK = ["Skvělé! 🎉", "Výborně! ⚡", "Trefa! 🎯", "Bomba! 💪", "Tak se to dělá! 👏", "Pokračuj! 🔥", "Bingo! ✨", "Tohle máš! 🌟"];
+const ENCOURAGE_BAD = ["Nevadí — vrátí se brzy. 💪", "Tohle je oříšek. Zapamatuj si vzor. 🌰", "Příště lépe! 📚", "Dáš to, jen klid. 😌", "Zkus si to projít znovu. 🔄"];
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function vibrate(pattern) { if (navigator.vibrate) try { navigator.vibrate(pattern); } catch {} }
 
 function buildDrillDeck(mode = "all") {
   drillMode = mode;
+  drillSessionMax = null;
+
   let pool = PAST_TESTS.map((_, i) => i);
   if (mode === "A") pool = pool.filter(i => PAST_TESTS[i].v === "A");
   else if (mode === "B") pool = pool.filter(i => PAST_TESTS[i].v === "B");
@@ -797,6 +807,18 @@ function buildDrillDeck(mode = "all") {
   else if (mode === "2024") pool = pool.filter(i => PAST_TESTS[i].v === "A" || PAST_TESTS[i].v === "B");
   else if (mode === "2023") pool = pool.filter(i => PAST_TESTS[i].v === "A23" || PAST_TESTS[i].v === "B23");
   else if (mode === "review") pool = pool.filter(i => state.drill.mastered[drillKey(PAST_TESTS[i])]);
+  else if (mode === "quick") {
+    // Rychlá session: 10 otázek, prioritně nezvládnuté + pár review
+    const fresh = shuffle(pool.filter(i => !state.drill.mastered[drillKey(PAST_TESTS[i])]));
+    const masteredArr = shuffle(pool.filter(i => state.drill.mastered[drillKey(PAST_TESTS[i])]));
+    pool = fresh.slice(0, 8).concat(masteredArr.slice(0, 2));
+    if (pool.length < 10) pool = pool.concat(fresh.slice(8, 10 - pool.length + 8));
+    drillSessionMax = 10;
+    drillPDeck = shuffle(pool);
+    drillPI = 0; drillAnswered = false;
+    drillSessionStats = { correct: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
+    return;
+  }
 
   // Nové/rozpracované nahoru, zvládnuté dolů
   const fresh = pool.filter(i => !state.drill.mastered[drillKey(PAST_TESTS[i])]);
@@ -804,50 +826,53 @@ function buildDrillDeck(mode = "all") {
   drillPDeck = shuffle(fresh).concat(shuffle(mastered));
   drillPI = 0;
   drillAnswered = false;
-  drillSessionStats = { correct: 0, wrong: 0 };
+  drillSessionStats = { correct: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
 }
 
 function renderDrill() {
+  if (drillAutoTimer) { clearTimeout(drillAutoTimer); drillAutoTimer = null; }
+
   const totalCount = PAST_TESTS.length;
   const masteredCount = Object.keys(state.drill.mastered).filter(k => state.drill.mastered[k]).length;
   const acc = state.drill.attempts ? Math.round(state.drill.correct / state.drill.attempts * 100) : 0;
 
   if (!drillPDeck.length) {
+    // ===== HOME / MODE PICKER =====
     app.innerHTML = `
-      <h2>🔥 Drill — Minulé zápočtové testy (ČZU Šumperk)</h2>
-      <div class="card" style="border-left:4px solid var(--accent)">
-        <p style="margin-top:0">Čtyři reálné zápočtové testy ze dvou ročníků: <b>2024/2025</b> (A + B = 60 otázek) a <b>2023/2024</b> (A23 + B23 = 59 otázek) — celkem <b>119 otázek</b>. Každá se bude opakovat, dokud na ni neodpovíš <b>2× správně za sebou</b>. Špatné odpovědi se vrací brzy, správné se posouvají dál. Tahle technika (spaced repetition + active recall) tě to naučí nejrychleji.</p>
-      </div>
+      <h2>🔥 Drill testů</h2>
+      <p style="color:var(--muted); margin:0 0 16px">Aktivně si dril<wbr>luj 119 otázek z minulých zápočtů. Každou musíš dát 2× správně za sebou — pak je tvoje.</p>
 
-      <div class="card">
-        <h3 style="margin-top:0">Tvůj pokrok</h3>
+      <div class="card drill-stats">
         <div class="stat"><span>Zvládnuté otázky</span><b>${masteredCount} / ${totalCount}</b></div>
         <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>
-        <div class="stat"><span>Celková přesnost</span><b>${acc} %</b></div>
-        <div class="stat"><span>Počet sessions</span><b>${state.drill.sessions}</b></div>
+        <div class="stat"><span>Přesnost (celkem)</span><b>${acc} %</b></div>
+        <div class="stat"><span>Sessions</span><b>${state.drill.sessions}</b></div>
       </div>
 
-      <div class="card">
-        <h3 style="margin-top:0">Vyber režim</h3>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-          <button class="primary" data-mode="all">🎯 Všech 119 otázek</button>
-          <button class="ghost" data-mode="review" ${masteredCount?'':'disabled'}>📖 Review (${masteredCount} zvládnutých)</button>
-        </div>
-        <h4 style="margin:14px 0 8px; color:var(--blue-shade)">Ročník 2024/2025 (60 otázek)</h4>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-          <button class="btn" data-mode="2024" style="background:var(--blue); color:#fff; box-shadow:0 4px 0 var(--blue-shade)">📘 Celý ročník 2024 (60)</button>
-          <button class="btn" data-mode="A" style="background:var(--blue); color:#fff; box-shadow:0 4px 0 var(--blue-shade); opacity:.85">Varianta A (30)</button>
-          <button class="btn" data-mode="B" style="background:#A560E8; color:#fff; box-shadow:0 4px 0 #7C3FBA">Varianta B (30)</button>
-        </div>
-        <h4 style="margin:14px 0 8px; color:var(--accent-2-shade)">Ročník 2023/2024 (59 otázek)</h4>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn" data-mode="2023" style="background:var(--accent-2); color:#fff; box-shadow:0 4px 0 var(--accent-2-shade)">📕 Celý ročník 2023 (59)</button>
-          <button class="btn" data-mode="A23" style="background:var(--accent-2); color:#fff; box-shadow:0 4px 0 var(--accent-2-shade); opacity:.85">Varianta A23 (29)</button>
-          <button class="btn" data-mode="B23" style="background:#FB923C; color:#fff; box-shadow:0 4px 0 #C77024">Varianta B23 (30)</button>
-        </div>
-        <p style="color:var(--muted); margin-top:14px; font-size:13px">💡 Klávesové zkratky: <b>1 / 2 / 3</b> odpověď, <b>Enter</b> = další otázka.</p>
-        ${masteredCount ? `<div style="margin-top:14px"><button class="ghost" id="drillReset">🗑️ Resetovat drill pokrok</button></div>` : ''}
+      <div class="drill-mode-stack">
+        <button class="primary drill-cta" data-mode="quick">⚡ Rychlá session <span class="drill-cta-sub">10 otázek · ~3 min</span></button>
+        <button class="primary drill-cta drill-cta-secondary" data-mode="all">🎯 Pokračovat (Všech 119)</button>
+        ${masteredCount ? `<button class="ghost drill-cta" data-mode="review">📖 Review zvládnutých (${masteredCount})</button>` : ''}
       </div>
+
+      <details class="drill-details">
+        <summary>Po ročníku / variantě</summary>
+        <h4 style="color:var(--blue-shade); margin:14px 0 8px">Ročník 2024/2025 (60 otázek)</h4>
+        <div class="drill-mode-row">
+          <button class="btn drill-mode-btn" data-mode="2024" style="background:var(--blue); box-shadow:0 4px 0 var(--blue-shade)">📘 Celý 2024 (60)</button>
+          <button class="btn drill-mode-btn" data-mode="A" style="background:var(--blue); box-shadow:0 4px 0 var(--blue-shade); opacity:.85">Varianta A (30)</button>
+          <button class="btn drill-mode-btn" data-mode="B" style="background:#A560E8; box-shadow:0 4px 0 #7C3FBA">Varianta B (30)</button>
+        </div>
+        <h4 style="color:var(--accent-2-shade); margin:14px 0 8px">Ročník 2023/2024 (59 otázek)</h4>
+        <div class="drill-mode-row">
+          <button class="btn drill-mode-btn" data-mode="2023" style="background:var(--accent-2); box-shadow:0 4px 0 var(--accent-2-shade)">📕 Celý 2023 (59)</button>
+          <button class="btn drill-mode-btn" data-mode="A23" style="background:var(--accent-2); box-shadow:0 4px 0 var(--accent-2-shade); opacity:.85">Varianta A23 (29)</button>
+          <button class="btn drill-mode-btn" data-mode="B23" style="background:#FB923C; box-shadow:0 4px 0 #C77024">Varianta B23 (30)</button>
+        </div>
+      </details>
+
+      <p style="color:var(--muted); margin-top:18px; font-size:12px; text-align:center">💡 Klávesy: <b>1 / 2 / 3</b> = odpověď · <b>Enter</b> = další</p>
+      ${masteredCount ? `<div style="margin-top:10px; text-align:center"><button class="ghost" id="drillReset" style="font-size:11px; padding:6px 12px">🗑️ Resetovat drill pokrok</button></div>` : ''}
     `;
     app.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => {
       buildDrillDeck(b.dataset.mode);
@@ -866,23 +891,39 @@ function renderDrill() {
     return;
   }
 
-  // Konec session (deck prázdný — všechny otázky zvládnuté v této session)
-  if (drillPI >= drillPDeck.length) {
+  // ===== END OF SESSION =====
+  if (drillPI >= drillPDeck.length || (drillSessionMax && (drillSessionStats.correct + drillSessionStats.wrong) >= drillSessionMax)) {
     const total = drillSessionStats.correct + drillSessionStats.wrong;
     const pct = total ? Math.round(drillSessionStats.correct / total * 100) : 0;
+    const isQuick = drillMode === "quick";
+    let cheer = "🎉 Skvělá práce!";
+    if (pct >= 90) cheer = "🏆 Bomba! Tohle máš ve fingrech.";
+    else if (pct >= 70) cheer = "🔥 Dobrá session — pokračuj!";
+    else if (pct >= 50) cheer = "💪 Slušné — ještě jeden kolo a bude to.";
+    else cheer = "📚 Hlavně se nedej. Tyhle se brzy vrátí.";
+
     app.innerHTML = `
-      <h2>🎉 Hotovo — session dokončena</h2>
-      <div class="card">
-        <h3 style="margin-top:0; color:var(--ok)">Všechny otázky v této session jsi zvládl/a 2× za sebou.</h3>
-        <div class="stat"><span>Správně</span><b style="color:var(--ok)">${drillSessionStats.correct}</b></div>
-        <div class="stat"><span>Špatně</span><b style="color:var(--err)">${drillSessionStats.wrong}</b></div>
-        <div class="stat"><span>Přesnost session</span><b>${pct} %</b></div>
-        <div class="stat"><span>Zvládnuté celkem</span><b>${masteredCount} / ${totalCount}</b></div>
-        <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>
-      </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-        <button class="primary" id="drillAgain">🔁 Další session</button>
-        <button class="ghost" id="drillBack">← Zpět na výběr</button>
+      <div class="drill-end">
+        <h2 style="text-align:center; margin-bottom:8px">${isQuick ? "⚡ Rychlá session hotová" : "🎉 Session dokončena"}</h2>
+        <p style="text-align:center; color:var(--muted); margin:0 0 18px; font-size:15px">${cheer}</p>
+
+        <div class="drill-end-score">
+          <div class="drill-end-num" style="color:${pct>=70?'var(--ok)':pct>=50?'var(--gold-shade)':'var(--err)'}">${pct} %</div>
+          <div class="drill-end-lbl">přesnost session</div>
+        </div>
+
+        <div class="card">
+          <div class="stat"><span>✅ Správně</span><b style="color:var(--ok)">${drillSessionStats.correct}</b></div>
+          <div class="stat"><span>❌ Špatně</span><b style="color:var(--err)">${drillSessionStats.wrong}</b></div>
+          <div class="stat"><span>🔥 Nejlepší řetězec</span><b>${drillSessionStats.bestStreak}</b></div>
+          <div class="stat"><span>🏆 Zvládnuté celkem</span><b>${masteredCount} / ${totalCount}</b></div>
+          <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>
+        </div>
+
+        <div class="drill-actions-stack">
+          <button class="primary drill-cta" id="drillAgain">🔁 Další session</button>
+          <button class="ghost drill-cta" id="drillBack">← Zpět na výběr</button>
+        </div>
       </div>
     `;
     document.getElementById("drillAgain").addEventListener("click", () => {
@@ -898,50 +939,75 @@ function renderDrill() {
     return;
   }
 
+  // ===== QUESTION VIEW =====
   const qIdx = drillPDeck[drillPI];
   const q = PAST_TESTS[qIdx];
   const key = drillKey(q);
   const streak = state.drill.streaks[key] || 0;
 
-  // Zamíchat možnosti (jen jednou pro aktuální otázku)
   if (!drillAnswered) {
     drillCurrentOpts = shuffle(q.opts.map((text, i) => ({ text, correct: i === q.a })));
   }
 
-  const remaining = drillPDeck.length - drillPI;
+  const sessionAnswered = drillSessionStats.correct + drillSessionStats.wrong;
+  const sessionTotal = drillSessionMax || drillPDeck.length;
+  const sessionPct = drillSessionMax ? (sessionAnswered / drillSessionMax * 100) : ((drillPI / drillPDeck.length) * 100);
+
+  const masteryHint = state.drill.mastered[key]
+    ? '<span class="drill-mastery-pill mastered">✓ Už zvládnutá — review</span>'
+    : streak === 0
+      ? '<span class="drill-mastery-pill fresh">Nová · 2× správně = zvládnutá</span>'
+      : '<span class="drill-mastery-pill streak1">✅ 1× — ještě 1× a máš ji!</span>';
+
+  const streakBadge = drillSessionStats.currentStreak > 0
+    ? `<span class="drill-streak active">🔥 <b>${drillSessionStats.currentStreak}</b></span>`
+    : `<span class="drill-streak">🔥 <b>0</b></span>`;
+
   const modeLabels = {
-    all:    "Všech 119",
-    "2024": "Ročník 2024 (A+B)",
-    "2023": "Ročník 2023 (A23+B23)",
-    A:      "Varianta A (2024)",
-    B:      "Varianta B (2024)",
-    A23:    "Varianta A23 (ZS 2023)",
-    B23:    "Varianta B23 (2023)",
-    review: "Review"
+    all: "Všech 119", "2024": "Ročník 2024", "2023": "Ročník 2023",
+    A: "Varianta A", B: "Varianta B", A23: "Varianta A23", B23: "Varianta B23",
+    review: "Review", quick: "Rychlá session"
   };
   const modeLabel = modeLabels[drillMode] || drillMode;
 
   app.innerHTML = `
-    <h2>🔥 Drill — ${modeLabel}</h2>
-    <div class="quiz-prog">
-      Otázka ${drillPI+1} / ${drillPDeck.length} · Zbývá: <b>${remaining}</b> · Zvládnuto celkem: <b>${masteredCount}/${totalCount}</b> · Session: ✅ ${drillSessionStats.correct} / ❌ ${drillSessionStats.wrong}
-    </div>
-    <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>
+    <div class="drill-stage">
+      <div class="drill-topbar">
+        <div class="drill-progress-row">
+          <div class="bar drill-progress-bar"><div class="bar-fill" style="width:${sessionPct}%"></div></div>
+          ${streakBadge}
+        </div>
+        <div class="drill-meta-row">
+          <span>${drillMode === "quick" ? `${sessionAnswered}/${drillSessionMax} odpovědí` : `Otázka ${drillPI+1}/${drillPDeck.length}`}</span>
+          <span class="dot">·</span>
+          <span>${modeLabel}</span>
+          <span class="dot">·</span>
+          <span>✅ ${drillSessionStats.correct} / ❌ ${drillSessionStats.wrong}</span>
+        </div>
+      </div>
 
-    <div class="card">
-      <div style="color:var(--muted); font-size:12px; margin-bottom:8px;">
-        Varianta ${q.v} · Otázka ${q.n}/30 · Streak: ${streak === 0 ? "— — —" : streak === 1 ? "✅ — —" : "✅ ✅ ✔️"}
+      <div class="drill-question-card">
+        <div class="drill-question-meta">Varianta ${q.v} · Otázka ${q.n}/30</div>
+        ${masteryHint}
+        <div class="drill-question">${q.q.replace("______", '<span class="drill-blank">______</span>')}</div>
       </div>
-      <div class="quiz-q" style="font-size:20px; line-height:1.5">${q.q.replace("______", '<span style="color:var(--accent); letter-spacing:2px">______</span>')}</div>
-      <div id="opts">
-        ${drillCurrentOpts.map((o, i) => `<button class="opt" data-i="${i}"><b style="color:var(--accent); margin-right:10px">${i+1}</b>${o.text}</button>`).join("")}
+
+      <div class="drill-options" id="opts">
+        ${drillCurrentOpts.map((o, i) => `
+          <button class="opt drill-opt" data-i="${i}">
+            <span class="drill-opt-num">${i+1}</span>
+            <span class="drill-opt-text">${o.text}</span>
+          </button>
+        `).join("")}
       </div>
-      <div id="feedback"></div>
-    </div>
-    <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="ghost" id="drillBack">← Zpět</button>
-      <button class="ghost" id="drillSkip">Přeskočit</button>
-      <button class="primary" id="drillNext" style="display:none">Další →</button>
+
+      <div id="feedback" class="drill-feedback"></div>
+
+      <div class="drill-actions" id="drillActions">
+        <button class="ghost drill-back-btn" id="drillBack">← Zpět</button>
+        <button class="ghost drill-skip-btn" id="drillSkip">Přeskočit</button>
+        <button class="primary drill-next-btn" id="drillNext" style="display:none">Další →</button>
+      </div>
     </div>
   `;
 
@@ -971,15 +1037,18 @@ function answerDrill(i) {
   if (ok) {
     state.drill.correct++;
     drillSessionStats.correct++;
+    drillSessionStats.currentStreak++;
+    if (drillSessionStats.currentStreak > drillSessionStats.bestStreak) {
+      drillSessionStats.bestStreak = drillSessionStats.currentStreak;
+    }
+    vibrate(30);  // krátká kladná vibrace
     const newStreak = (state.drill.streaks[key] || 0) + 1;
     state.drill.streaks[key] = newStreak;
     if (newStreak >= 2) {
       state.drill.mastered[key] = true;
-      // Odstranit z decku
       drillPDeck.splice(drillPI, 1);
-      drillPI--; // po drillPI++ v nextDrill skončíme na správné pozici
+      drillPI--;
     } else {
-      // Re-insert o 8-12 pozic dál
       drillPDeck.splice(drillPI, 1);
       const insertAt = Math.min(drillPDeck.length, drillPI + 8 + Math.floor(Math.random()*5));
       drillPDeck.splice(insertAt, 0, qIdx);
@@ -987,8 +1056,9 @@ function answerDrill(i) {
     }
   } else {
     drillSessionStats.wrong++;
+    drillSessionStats.currentStreak = 0;
+    vibrate([60, 40, 60]);  // delší "wrong" pattern
     state.drill.streaks[key] = 0;
-    // Re-insert o 2-4 pozice dál (vrátí se brzy)
     drillPDeck.splice(drillPI, 1);
     const insertAt = Math.min(drillPDeck.length, drillPI + 2 + Math.floor(Math.random()*3));
     drillPDeck.splice(insertAt, 0, qIdx);
@@ -997,15 +1067,45 @@ function answerDrill(i) {
   save();
 
   const correctText = q.opts[q.a];
+  const cheer = ok ? pick(ENCOURAGE_OK) : pick(ENCOURAGE_BAD);
+  const willMaster = ok && (state.drill.mastered[key]);
+  const masteryNote = willMaster ? '<div class="drill-master-pop">🏆 Otázka zvládnutá! Posouvá se do review.</div>' : '';
+
   document.getElementById("feedback").innerHTML = `
-    <div class="expl ${ok?'ok':'bad'}">
-      <b>${ok ? '✅ Správně!' : '❌ Špatně.'}</b>
-      ${!ok ? `Správná odpověď: <b style="color:var(--ok)">${correctText}</b>.<br>` : ''}
-      <span style="color:var(--text)">${q.expl}</span>
+    <div class="expl ${ok?'ok':'bad'} drill-feedback-box">
+      <div class="drill-feedback-head"><b>${ok ? '✅ Správně!' : '❌ Špatně.'}</b> <span class="drill-cheer">${cheer}</span></div>
+      ${!ok ? `<div class="drill-feedback-correct">Správná odpověď: <b>${correctText}</b></div>` : ''}
+      <div class="drill-feedback-expl">${q.expl}</div>
+      ${masteryNote}
     </div>
   `;
-  document.getElementById("drillNext").style.display = "inline-block";
-  document.getElementById("drillNext").focus();
+
+  // Aktualizovat streak badge nahoře (bez plného re-renderu)
+  const streakEl = document.querySelector(".drill-streak");
+  if (streakEl) {
+    streakEl.classList.toggle("active", drillSessionStats.currentStreak > 0);
+    streakEl.innerHTML = `🔥 <b>${drillSessionStats.currentStreak}</b>`;
+  }
+  // Aktualizovat skóre v meta řádku
+  const metaRow = document.querySelector(".drill-meta-row");
+  if (metaRow) {
+    const last = metaRow.lastElementChild;
+    if (last) last.textContent = `✅ ${drillSessionStats.correct} / ❌ ${drillSessionStats.wrong}`;
+  }
+
+  const nextBtn = document.getElementById("drillNext");
+  nextBtn.style.display = "block";
+  nextBtn.focus();
+
+  // Auto-advance na správné odpovědi (1.2s) — uživatel může klepnout Další pro okamžitý přechod
+  if (ok) {
+    nextBtn.classList.add("drill-next-auto");
+    nextBtn.innerHTML = 'Další → <span class="drill-auto-bar"></span>';
+    drillAutoTimer = setTimeout(() => {
+      drillAutoTimer = null;
+      nextDrill();
+    }, 1200);
+  }
 }
 
 function nextDrill() {
