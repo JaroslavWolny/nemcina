@@ -1070,12 +1070,22 @@ function answerDrill(i) {
   const cheer = ok ? pick(ENCOURAGE_OK) : pick(ENCOURAGE_BAD);
   const willMaster = ok && (state.drill.mastered[key]);
   const masteryNote = willMaster ? '<div class="drill-master-pop">🏆 Otázka zvládnutá! Posouvá se do review.</div>' : '';
+  // Plná správná věta s vyplněnou odpovědí (zvýrazněná). Pokud je správná odpověď "0", doplníme prázdno.
+  const fillText = correctText === "0" ? "" : correctText;
+  const fullSentence = q.q.replace("______", `<mark class="drill-answer-fill">${fillText || "—"}</mark>`);
+  const czLine = q.cz ? `<div class="drill-feedback-cz"><span class="drill-feedback-cz-flag">🇨🇿</span> ${q.cz}</div>` : '';
 
   document.getElementById("feedback").innerHTML = `
     <div class="expl ${ok?'ok':'bad'} drill-feedback-box">
       <div class="drill-feedback-head"><b>${ok ? '✅ Správně!' : '❌ Špatně.'}</b> <span class="drill-cheer">${cheer}</span></div>
-      ${!ok ? `<div class="drill-feedback-correct">Správná odpověď: <b>${correctText}</b></div>` : ''}
-      <div class="drill-feedback-expl">${q.expl}</div>
+      ${!ok ? `
+        <div class="drill-feedback-correct">Správná odpověď: <b>${correctText === "0" ? "(nic — prázdné pole)" : correctText}</b></div>
+        <div class="drill-feedback-sentence">
+          <div class="drill-feedback-sentence-de">${fullSentence}</div>
+          ${czLine}
+        </div>
+        <div class="drill-feedback-why"><span class="drill-feedback-why-label">💡 Proč:</span> ${q.expl}</div>
+      ` : `<div class="drill-feedback-expl">${q.expl}</div>`}
       ${masteryNote}
     </div>
   `;
