@@ -1991,3 +1991,126 @@ const PAST_TESTS = [
   { v: "A23", n: 30, q: "Wo sind ______ Freundin?", opts: ["Kinder unserer","Kind unser","Kinder unser"], a: 0,
     expl: "„Kinder unserer Freundin“ = děti naší kamarádky (plurál + GENITIV feminin: unserer).", cz: "Kde jsou děti naší kamarádky?" }
 ];
+
+// ==== ÚSTNÍ ZKOUŠKA (Mündliche Prüfung) ====
+// 7 témat × ~10 vět. Pro každé téma: id, emoji, title (CZ), de (DE), sentences = [[de, cz], ...]
+const ORAL_EXAM = [
+  {
+    id: "self", emoji: "👤", title: "O sobě", de: "Über mich",
+    intro: "Základní představení sebe sama. Začni vždy tímto blokem.",
+    sentences: [
+      ["Ich heiße Jaroslav Wolný.", "Jmenuji se Jaroslav Wolný."],
+      ["Ich komme aus Jeseník.", "Pocházím z Jeseníku."],
+      ["Ich wohne in Jeseník. Ich wohne allein.", "Bydlím v Jeseníku. Bydlím sám."],
+      ["Ja, ich arbeite. Ich bin Datenanalyst.", "Ano, pracuji. Jsem datový analytik."],
+      ["Ja, ich studiere an der ČZU in Prag.", "Ano, studuji na ČZU v Praze."],
+      ["Ich bin im zweiten Jahr.", "Jsem ve druhém ročníku."],
+      ["Ich spreche Tschechisch und Englisch.", "Mluvím česky a anglicky."],
+      ["Ich lerne jetzt Deutsch.", "Teď se učím německy."],
+      ["In der Freizeit gehe ich ins Fitnessstudio.", "Ve volném čase chodím do posilovny."],
+      ["Ich mache Hiking und ich bin DJ.", "Chodím na túry a jsem DJ."],
+      ["Ich esse gern Burger und Steak.", "Rád jím burger a steak."],
+    ]
+  },
+  {
+    id: "arbeit", emoji: "💼", title: "Práce", de: "Arbeit",
+    intro: "Téma 1 — pracovní pozice, popis dne v práci, pracovní stůl, plány.",
+    sentences: [
+      ["Ich arbeite als Datenanalyst.", "Pracuji jako datový analytik."],
+      ["Ich arbeite seit einem Jahr.", "Pracuji jeden rok."],
+      ["Ich arbeite von acht Uhr bis sechzehn Uhr.", "Pracuji od osmi do šestnácti."],
+      ["Ich arbeite in der IT-Abteilung.", "Pracuji v IT oddělení."],
+      ["Ich muss Daten verarbeiten und programmieren.", "Musím zpracovávat data a programovat."],
+      ["Auf dem Schreibtisch habe ich einen Computer und ein Telefon.", "Na stole mám počítač a telefon."],
+      ["Der Computer ist schwarz. Das Telefon ist weiß.", "Počítač je černý. Telefon je bílý."],
+      ["Gestern habe ich Daten verarbeitet und programmiert.", "Včera jsem zpracovával data a programoval."],
+      ["Mein Traumberuf ist Programmierer oder Datenanalyst.", "Můj vysněný obor je programátor nebo analytik."],
+      ["Ich möchte in einer IT-Firma in Tschechien arbeiten.", "Chci pracovat v IT firmě v Česku."],
+      ["Ich kann Daten analysieren und programmieren.", "Umím analyzovat data a programovat."],
+      ["Das ist sehr interessant für mich.", "To je pro mě velmi zajímavé."],
+      ["Ja, ich möchte auf Dienstreisen fahren.", "Ano, chci jezdit na pracovní cesty."],
+    ]
+  },
+  {
+    id: "apple", emoji: "🍎", title: "Firma: Apple", de: "Firma vorstellen: Apple",
+    intro: "Téma 2 — představení známé firmy. Klíčová slova: existiert seit, Bereiche, leitet.",
+    sentences: [
+      ["Ich präsentiere die Firma Apple.", "Prezentuji firmu Apple."],
+      ["Apple existiert seit fast 50 Jahren.", "Apple existuje téměř 50 let."],
+      ["Apple ist in Cupertino, in den USA.", "Apple je v Cupertinu, v USA."],
+      ["Dort arbeiten über 150.000 Personen.", "Tam pracuje přes 150 000 lidí."],
+      ["Apple macht Computer, Telefone und Tablets.", "Apple vyrábí počítače, telefony a tablety."],
+      ["Das iPhone und der Mac sind sehr bekannt.", "iPhone a Mac jsou velmi známé."],
+      ["Tim Cook leitet Apple.", "Tim Cook vede Apple."],
+      ["Apple hat Bereiche: Design, Software und Marketing.", "Apple má: design, software a marketing."],
+      ["Ich habe Apple ausgewählt, weil Apple sehr bekannt ist.", "Vybral jsem Apple, protože je velmi známý."],
+      ["Ich kenne das iPhone und den Mac.", "Znám iPhone a Mac."],
+    ]
+  },
+  {
+    id: "semester", emoji: "📅", title: "Týden v semestru", de: "Semesterwoche",
+    intro: "Téma 3 — popis týdenního rozvrhu, dojíždění, semestry.",
+    sentences: [
+      ["Ich fahre zweimal pro Woche zur Universität.", "Jedu na univerzitu dvakrát týdně."],
+      ["Ich fahre mit dem Zug von Jeseník nach Prag.", "Jedu vlakem z Jeseníku do Prahy."],
+      ["Der Weg dauert circa vier Stunden.", "Cesta trvá asi čtyři hodiny."],
+      ["Am Montag und Dienstag studiere ich.", "V pondělí a v úterý studuji."],
+      ["Am Mittwoch und Donnerstag arbeite ich.", "Ve středu a ve čtvrtek pracuji."],
+      ["Ich habe Unterricht von neun Uhr bis fünfzehn Uhr.", "Mám výuku od devíti do patnácti."],
+      ["Ich muss viel lernen und lesen.", "Musím hodně studovat a číst."],
+      ["Das letzte Wintersemester war von Oktober bis Februar.", "Zimní semestr byl od října do února."],
+      ["Das letzte Sommersemester war von März bis Juni.", "Letní semestr byl od března do června."],
+      ["Ich habe Bücher gelesen und gelernt.", "Četl jsem knihy a studoval."],
+    ]
+  },
+  {
+    id: "familie", emoji: "👨‍👩‍👦", title: "Rodina", de: "Familie",
+    intro: "Téma 4 — rodiče, jejich práce, koníčky, společné aktivity.",
+    sentences: [
+      ["Meine Familie ist klein.", "Moje rodina je malá."],
+      ["Ich habe keine Schwester und keinen Bruder.", "Nemám sestru ani bratra."],
+      ["Meine Eltern wohnen in Jeseník.", "Moji rodiče bydlí v Jeseníku."],
+      ["Meine Mutter arbeitet in Jeseník.", "Moje matka pracuje v Jeseníku."],
+      ["Mein Vater arbeitet auch in Jeseník.", "Můj otec také pracuje v Jeseníku."],
+      ["Sie sprechen Tschechisch.", "Mluví česky."],
+      ["In der Freizeit gehen sie spazieren.", "Ve volném čase chodí na procházky."],
+      ["Sie essen gern tschechisches Essen.", "Rádi jedí české jídlo."],
+      ["Meine Eltern hatten Urlaub in Tschechien.", "Moji rodiče měli dovolenou v Česku."],
+      ["Das Wetter war schön.", "Počasí bylo hezké."],
+    ]
+  },
+  {
+    id: "urlaub", emoji: "🌴", title: "Dovolená", de: "Urlaub",
+    intro: "Téma 5 — poslední dovolená v perfektu, plány do budoucna.",
+    sentences: [
+      ["Mein letzter Urlaub war im Sommer.", "Moje poslední dovolená byla v létě."],
+      ["Ich war in den Bergen — in den Jeseníky.", "Byl jsem v horách — v Jeseníkách."],
+      ["Ich war eine Woche dort.", "Byl jsem tam jeden týden."],
+      ["Das Wetter war schön und warm.", "Počasí bylo hezké a teplé."],
+      ["Ich habe Hiking gemacht.", "Chodil jsem na túry."],
+      ["Ich habe die Natur gesehen.", "Viděl jsem přírodu."],
+      ["Ich habe Freunde gesehen.", "Viděl jsem přátele."],
+      ["Ich habe Steak und Burger gegessen.", "Jedl jsem steak a burger."],
+      ["Nächstes Mal möchte ich nach Österreich fahren.", "Příště chci jet do Rakouska."],
+      ["Dieses Jahr mache ich Urlaub im Sommer.", "Letos budu mít dovolenou v létě."],
+    ]
+  },
+  {
+    id: "freizeit", emoji: "🎮", title: "Volný čas", de: "Freizeit",
+    intro: "Téma 6 — víkendy, hobby, hudba, restaurace.",
+    sentences: [
+      ["Am Wochenende gehe ich ins Fitnessstudio.", "O víkendu chodím do posilovny."],
+      ["Ich gehe manchmal ins Restaurant.", "Někdy chodím do restaurace."],
+      ["Ich treffe Freunde.", "Potkávám přátele."],
+      ["Ich mag Burger und Steak.", "Mám rád burger a steak."],
+      ["Ich möchte Wasser bestellen. Ich trinke keinen Alkohol.", "Chci objednat vodu. Nepiji alkohol."],
+      ["Ich bezahle circa 300 Kronen.", "Platím asi 300 korun."],
+      ["Ich gehe manchmal ins Kino.", "Někdy chodím do kina."],
+      ["Ich höre Drum and Bass Musik.", "Poslouchám Drum and Bass."],
+      ["Mein Hobby ist Sport, Musik und Hiking.", "Mým koníčkem je sport, hudba a turistika."],
+      ["Ich kann DJ spielen und programmieren.", "Umím hrát jako DJ a programovat."],
+      ["Am letzten Wochenende war ich im Kino und in den Bergen.", "Minulý víkend jsem byl v kině a v horách."],
+      ["Das hat mir sehr gefallen!", "To se mi velmi líbilo!"],
+    ]
+  },
+];

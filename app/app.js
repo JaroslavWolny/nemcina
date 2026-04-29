@@ -1,7 +1,8 @@
 // ==== State & storage ====
 const STORE_KEY = "nemcina-a1-progress-v1";
-const state = load() || { known: {}, quiz: { best: 0, done: 0 }, flash: { seen: 0 }, drill: { mastered: {}, streaks: {}, attempts: 0, correct: 0, sessions: 0 } };
+const state = load() || { known: {}, quiz: { best: 0, done: 0 }, flash: { seen: 0 }, drill: { mastered: {}, streaks: {}, attempts: 0, correct: 0, sessions: 0 }, oral: { mastered: {} } };
 if (!state.drill) state.drill = { mastered: {}, streaks: {}, attempts: 0, correct: 0, sessions: 0 };
+if (!state.oral) state.oral = { mastered: {} };
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); if (typeof renderRail === "function") renderRail(); }
 function load() { try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return null; } }
 
@@ -33,6 +34,7 @@ function render(view) {
     case "exam": return renderExam();
     case "test": return renderTest();
     case "drill": return renderDrill();
+    case "oral": return renderOral();
     case "progress": return renderProgress();
   }
 }
@@ -92,6 +94,7 @@ function renderHome() {
     <div class="grid">
       <div class="tile" data-go="test" style="border-color:var(--accent)"><h3>🎓 Zápočet (START ZDE)</h3><small>Principy testu, vzorový test, drilly, popis obrázků, simulace. <b>Nejdůležitější sekce.</b></small></div>
       <div class="tile" data-go="drill" style="border-color:var(--accent-2)"><h3>🔥 Drill minulých testů</h3><small><b>119 reálných otázek</b> ze 4 zápočtových testů (ročníky 2023 + 2024, varianty A/B). Spaced repetition — naučíš se je nazpaměť. <b>Klikačka!</b></small></div>
+      <div class="tile" data-go="oral" style="border-color:var(--blue)"><h3>🗣️ Ústní zkouška</h3><small><b>7 témat</b> s větami nazpaměť (O sobě, Práce, Apple, Týden, Rodina, Dovolená, Volný čas). Výslovnost přes 🔊, trénink CZ→DE.</small></div>
       <div class="tile" data-go="grammar"><h3>📖 Gramatika</h3><small>10 týdnů: Perfektum, modálky v préteritu, imperativ, spojky ADUSO, lokální předložky…</small></div>
       <div class="tile" data-go="vocab"><h3>📚 Slovíčka</h3><small>5 lekcí, ${total} slov po kategoriích. Hledání + označování naučených.</small></div>
       <div class="tile" data-go="flashcards"><h3>🃏 Kartičky</h3><small>CZ↔DE, výběr lekce, klávesové zkratky (mezerník otočí, šipky posouvají).</small></div>
@@ -1139,6 +1142,302 @@ document.addEventListener("keydown", e => {
     if (idx < drillCurrentOpts.length) { e.preventDefault(); answerDrill(idx); }
   }
 });
+
+// ==== ÚSTNÍ ZKOUŠKA ====
+// Stav: state.oral.mastered[`${topicId}|${idx}`] = true
+// Režimy: "browse" (přehled + 🔊) | "train" (CZ→DE recall + odhalit + auto-play)
+let oralTopic = null;       // null = výběr tématu, jinak topic id
+let oralMode = "browse";    // "browse" | "train"
+let oralTrainIdx = 0;
+let oralRevealed = false;
+let oralPlayAllAbort = false;
+
+const oralKey = (topicId, idx) => `${topicId}|${idx}`;
+const oralFindTopic = id => ORAL_EXAM.find(t => t.id === id);
+const oralMasteredCount = topic => topic.sentences.reduce((acc, _, i) => acc + (state.oral.mastered[oralKey(topic.id, i)] ? 1 : 0), 0);
+
+function speakDe(text, rate = 0.9) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "de-DE";
+  u.rate = rate;
+  window.speechSynthesis.speak(u);
+}
+
+function renderOral() {
+  // Cancel any ongoing speech when re-rendering the view
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  oralPlayAllAbort = true; // signal any sequential player to stop
+
+  if (!oralTopic) return renderOralHome();
+  const topic = oralFindTopic(oralTopic);
+  if (!topic) { oralTopic = null; return renderOralHome(); }
+  if (oralMode === "train") return renderOralTrain(topic);
+  return renderOralBrowse(topic);
+}
+
+function renderOralHome() {
+  const totalSentences = ORAL_EXAM.reduce((a, t) => a + t.sentences.length, 0);
+  const totalMastered = ORAL_EXAM.reduce((a, t) => a + oralMasteredCount(t), 0);
+  const speechSupport = ("speechSynthesis" in window);
+
+  app.innerHTML = `
+    <h2>🗣️ Ústní zkouška</h2>
+    <p style="color:var(--muted); margin:0 0 14px">Nauč se 7 témat nazpaměť. Klepni 🔊 a slyšíš německou výslovnost (umělý hlas v prohlížeči). V trénovacím režimu vidíš český překlad a sám/sama říkáš německy.</p>
+
+    ${!speechSupport ? `<div class="card" style="border-left:4px solid var(--err); background:var(--accent-2-tint)">
+      <b>⚠️ Tento prohlížeč nepodporuje hlasovou syntézu.</b> Přehrávání výslovnosti nebude fungovat. Vyzkoušej Chrome / Safari / Edge.
+    </div>` : ''}
+
+    <div class="card oral-overall">
+      <div class="stat"><span>Naučené věty (celkem)</span><b>${totalMastered} / ${totalSentences}</b></div>
+      <div class="bar"><div class="bar-fill" style="width:${totalSentences?totalMastered/totalSentences*100:0}%"></div></div>
+    </div>
+
+    <h3 style="margin:18px 0 10px">Vyber téma</h3>
+    <div class="oral-topics">
+      ${ORAL_EXAM.map(t => {
+        const m = oralMasteredCount(t);
+        const tot = t.sentences.length;
+        const pct = tot ? m/tot*100 : 0;
+        return `
+          <button class="oral-topic-card" data-topic="${t.id}">
+            <div class="oral-topic-emoji">${t.emoji}</div>
+            <div class="oral-topic-body">
+              <div class="oral-topic-title">${t.title}</div>
+              <div class="oral-topic-de">${t.de}</div>
+              <div class="oral-topic-meta">${m} / ${tot} naučeno · ${tot} vět</div>
+              <div class="bar oral-topic-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+            </div>
+            <div class="oral-topic-go">›</div>
+          </button>
+        `;
+      }).join("")}
+    </div>
+
+    <details class="drill-details" style="margin-top:18px">
+      <summary>💡 Tipy na zapamatování (z PDF)</summary>
+      <ul style="margin:10px 0 4px; padding-left:20px; color:var(--text); font-size:14px; line-height:1.6">
+        <li>Uč se <b>jedno téma denně</b> — ne vše najednou.</li>
+        <li>Říkej věty <b>NAHLAS</b> — výslovnost A1 je logická.</li>
+        <li>Slova jako Burger, Steak, DJ, Hiking, Computer, Telefon, Fitness = stejná v němčině.</li>
+        <li>Pokud zapomeneš slovo, řekni: <i>"Moment bitte..."</i> a zopakuj větu.</li>
+        <li>Každá věta = jeden fakt. Nespojuj víc věcí dohromady.</li>
+      </ul>
+    </details>
+  `;
+
+  app.querySelectorAll(".oral-topic-card").forEach(b => b.addEventListener("click", () => {
+    oralTopic = b.dataset.topic;
+    oralMode = "browse";
+    renderOral();
+  }));
+}
+
+function renderOralTopicHeader(topic) {
+  const m = oralMasteredCount(topic);
+  const tot = topic.sentences.length;
+  const pct = tot ? m/tot*100 : 0;
+  return `
+    <div class="oral-header">
+      <button class="ghost oral-back" id="oralBack">← Zpět na výběr</button>
+      <div class="oral-header-title">
+        <span class="oral-header-emoji">${topic.emoji}</span>
+        <div>
+          <div class="oral-header-h">${topic.title}</div>
+          <div class="oral-header-de">${topic.de}</div>
+        </div>
+      </div>
+      ${topic.intro ? `<div class="oral-header-intro">${topic.intro}</div>` : ''}
+      <div class="oral-header-progress">
+        <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="oral-header-progress-txt">${m} / ${tot} naučeno</div>
+      </div>
+      <div class="oral-mode-tabs">
+        <button class="oral-mode-tab ${oralMode==='browse'?'active':''}" data-mode="browse">📜 Přehled</button>
+        <button class="oral-mode-tab ${oralMode==='train'?'active':''}" data-mode="train">🧠 Trénink (CZ→DE)</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderOralBrowse(topic) {
+  app.innerHTML = `
+    ${renderOralTopicHeader(topic)}
+    <div class="oral-actions-row">
+      <button class="primary oral-play-all" id="oralPlayAll">▶ Přehrát celé téma</button>
+      <button class="ghost" id="oralStop">⏹ Stop</button>
+    </div>
+    <div class="oral-list">
+      ${topic.sentences.map(([de, cz], i) => {
+        const k = oralKey(topic.id, i);
+        const known = state.oral.mastered[k];
+        return `
+          <div class="oral-row ${known?'known':''}" data-i="${i}">
+            <div class="oral-row-num">${i+1}</div>
+            <div class="oral-row-body">
+              <div class="oral-row-de">${de}</div>
+              <div class="oral-row-cz">${cz}</div>
+            </div>
+            <div class="oral-row-actions">
+              <button class="oral-play-btn" data-de="${encodeURIComponent(de)}" title="Přehrát výslovnost">🔊</button>
+              <button class="oral-play-btn oral-play-slow" data-de="${encodeURIComponent(de)}" title="Pomalu">🐌</button>
+              <button class="oral-know-btn ${known?'on':''}" data-key="${k}">${known?'✓ Umím':'Umím'}</button>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  document.getElementById("oralBack").addEventListener("click", () => { oralTopic = null; renderOral(); });
+  app.querySelectorAll(".oral-mode-tab").forEach(b => b.addEventListener("click", () => {
+    oralMode = b.dataset.mode;
+    if (oralMode === "train") { oralTrainIdx = 0; oralRevealed = false; }
+    renderOral();
+  }));
+  app.querySelectorAll(".oral-play-btn").forEach(b => b.addEventListener("click", () => {
+    const text = decodeURIComponent(b.dataset.de);
+    const slow = b.classList.contains("oral-play-slow");
+    speakDe(text, slow ? 0.65 : 0.9);
+    b.classList.add("speaking");
+    setTimeout(() => b.classList.remove("speaking"), 1500);
+  }));
+  app.querySelectorAll(".oral-know-btn").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.key;
+    state.oral.mastered[k] = !state.oral.mastered[k];
+    save();
+    renderOral();
+  }));
+  document.getElementById("oralPlayAll").addEventListener("click", () => playOralSequence(topic));
+  document.getElementById("oralStop").addEventListener("click", () => {
+    oralPlayAllAbort = true;
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  });
+}
+
+function playOralSequence(topic) {
+  if (!("speechSynthesis" in window)) return;
+  oralPlayAllAbort = false;
+  let i = 0;
+  const playNext = () => {
+    if (oralPlayAllAbort) return;
+    if (i >= topic.sentences.length) return;
+    const [de] = topic.sentences[i];
+    // Highlight current row
+    app.querySelectorAll(".oral-row").forEach(r => r.classList.remove("playing"));
+    const row = app.querySelector(`.oral-row[data-i="${i}"]`);
+    if (row) {
+      row.classList.add("playing");
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    const u = new SpeechSynthesisUtterance(de);
+    u.lang = "de-DE";
+    u.rate = 0.9;
+    u.onend = () => { i++; setTimeout(playNext, 400); };
+    u.onerror = () => { i++; setTimeout(playNext, 400); };
+    window.speechSynthesis.speak(u);
+  };
+  playNext();
+}
+
+function renderOralTrain(topic) {
+  const total = topic.sentences.length;
+  if (oralTrainIdx >= total) {
+    const m = oralMasteredCount(topic);
+    app.innerHTML = `
+      ${renderOralTopicHeader(topic)}
+      <div class="card" style="text-align:center; padding:24px">
+        <h2 style="margin:0 0 8px">🎉 Téma projeté!</h2>
+        <p style="color:var(--muted); margin:0 0 16px">Naučeno ${m} / ${total} vět v tomto tématu.</p>
+        <div class="oral-actions-row" style="justify-content:center">
+          <button class="primary" id="oralTrainAgain">🔁 Znovu od začátku</button>
+          <button class="ghost" id="oralTrainBrowse">📜 Přehled</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("oralBack").addEventListener("click", () => { oralTopic = null; renderOral(); });
+    app.querySelectorAll(".oral-mode-tab").forEach(b => b.addEventListener("click", () => {
+      oralMode = b.dataset.mode; oralTrainIdx = 0; oralRevealed = false; renderOral();
+    }));
+    document.getElementById("oralTrainAgain").addEventListener("click", () => {
+      oralTrainIdx = 0; oralRevealed = false; renderOral();
+    });
+    document.getElementById("oralTrainBrowse").addEventListener("click", () => {
+      oralMode = "browse"; renderOral();
+    });
+    return;
+  }
+
+  const [de, cz] = topic.sentences[oralTrainIdx];
+  const k = oralKey(topic.id, oralTrainIdx);
+  const known = state.oral.mastered[k];
+
+  app.innerHTML = `
+    ${renderOralTopicHeader(topic)}
+    <div class="oral-train-card">
+      <div class="oral-train-progress">Věta ${oralTrainIdx+1} / ${total}</div>
+      <div class="oral-train-prompt">
+        <div class="oral-train-label">🇨🇿 Řekni německy nahlas:</div>
+        <div class="oral-train-cz">${cz}</div>
+      </div>
+      ${oralRevealed ? `
+        <div class="oral-train-reveal">
+          <div class="oral-train-label">🇩🇪 Správně:</div>
+          <div class="oral-train-de-row">
+            <div class="oral-train-de">${de}</div>
+            <button class="oral-play-btn oral-train-play" id="oralTrainPlay" title="Přehrát">🔊</button>
+            <button class="oral-play-btn oral-play-slow" id="oralTrainPlaySlow" title="Pomalu">🐌</button>
+          </div>
+        </div>
+      ` : `
+        <div class="oral-train-hint">💭 Zkus to nejdřív sám/sama. Pak klepni „Odhalit".</div>
+      `}
+    </div>
+
+    <div class="oral-train-actions">
+      ${!oralRevealed
+        ? `<button class="primary oral-train-cta" id="oralReveal">👁 Odhalit + přehrát</button>`
+        : `
+          <button class="ghost oral-train-skip" id="oralTrainAgain">↺ Ještě jednou</button>
+          <button class="ghost oral-train-skip" id="oralTrainNext">→ Další</button>
+          <button class="primary oral-train-cta" id="oralTrainKnow">${known?'✓ Umím (přepnuto)':'✓ Umím — další'}</button>
+        `
+      }
+    </div>
+  `;
+
+  document.getElementById("oralBack").addEventListener("click", () => { oralTopic = null; renderOral(); });
+  app.querySelectorAll(".oral-mode-tab").forEach(b => b.addEventListener("click", () => {
+    oralMode = b.dataset.mode; renderOral();
+  }));
+
+  if (!oralRevealed) {
+    document.getElementById("oralReveal").addEventListener("click", () => {
+      oralRevealed = true;
+      renderOral();
+      // Auto-play German pronunciation right after reveal
+      setTimeout(() => speakDe(de, 0.9), 100);
+    });
+  } else {
+    const playBtn = document.getElementById("oralTrainPlay");
+    const playSlowBtn = document.getElementById("oralTrainPlaySlow");
+    if (playBtn) playBtn.addEventListener("click", () => speakDe(de, 0.9));
+    if (playSlowBtn) playSlowBtn.addEventListener("click", () => speakDe(de, 0.65));
+    document.getElementById("oralTrainAgain").addEventListener("click", () => {
+      oralRevealed = false; renderOral();
+    });
+    document.getElementById("oralTrainNext").addEventListener("click", () => {
+      oralTrainIdx++; oralRevealed = false; renderOral();
+    });
+    document.getElementById("oralTrainKnow").addEventListener("click", () => {
+      state.oral.mastered[k] = true;
+      save();
+      oralTrainIdx++; oralRevealed = false; renderOral();
+    });
+  }
+}
 
 // ==== Init ====
 renderRail();
