@@ -942,10 +942,54 @@ let drillPDeck = [];          // pole indexů (do PAST_TESTS)
 let drillPI = 0;
 let drillAnswered = false;
 let drillCurrentOpts = [];   // zamíchané možnosti pro aktuální otázku [{text, correct}]
-let drillMode = "all";       // "all" | "A" | "B" | "review" | "quick"
+let drillMode = "all";       // "all" | "A" | "B" | "review" | "quick" | "exam2024"
 let drillSessionStats = { correct: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
 let drillSessionMax = null;  // null = neomezeno; číslo = ukončit po N odpovědích
 let drillAutoTimer = null;   // setTimeout handle pro auto-advance
+let drillSessionWrong = [];  // [{key, topic, q, correct, chosen}] pro cvičný test
+
+// Mapa otázek LS 2024/2025 (varianta A1–A30, B1–B30) → kategorie pro „na co si dát pozor"
+const LS2024_TOPICS = {
+  A1:"verbForms", A2:"verbForms", A3:"verbForms", B14:"verbForms", B16:"verbForms",
+  B15:"imperativ",
+  A4:"interrog",
+  A6:"datum", B1:"datum",
+  A5:"adjEnd", A7:"adjEnd", A8:"adjEnd", A19:"adjEnd", A21:"adjEnd",
+  A24:"adjEnd", A25:"adjEnd", A27:"adjEnd",
+  B2:"adjEnd", B3:"adjEnd", B4:"adjEnd", B7:"adjEnd", B8:"adjEnd",
+  B9:"adjEnd", B12:"adjEnd", B23:"adjEnd", B25:"adjEnd", B27:"adjEnd",
+  A9:"wohinWo", B5:"wohinWo",
+  A10:"modal", B6:"modal", B17:"modal",
+  A11:"subord", A14:"subord", A28:"subord", B11:"subord", B19:"subord",
+  A17:"inversion", B20:"inversion",
+  A12:"negation", A15:"negation", B18:"negation", B21:"negation",
+  A16:"reflexive", B13:"reflexive",
+  A18:"separable", B22:"separable",
+  A20:"comparison", A22:"comparison", A23:"comparison",
+  B24:"comparison", B26:"comparison", B28:"comparison",
+  A13:"prepCase", A26:"prepCase", B10:"prepCase", B27:"prepCase",
+  A29:"pronoun", B29:"pronoun",
+  A30:"verbColloc", B30:"verbColloc",
+};
+
+const TOPIC_TIPS = {
+  verbForms:  { label: "Časování silných sloves", tip: "sprechen, lesen, nehmen, geben mění kmen v <b>du</b> a <b>er/sie/es</b> (e→i, e→ie). U <b>fahren/laufen</b> je přehláska v <b>du/er/sie/es</b>, ALE v <b>ihr-tvaru přehláska MIZÍ</b> (ihr lauft, ihr fahrt)." },
+  imperativ:  { label: "Imperativ", tip: "Imperativ <b>du</b>: vezmi přítomný čas du-tvaru, odeber -st. U <b>fahren/laufen</b> přehláska <b>MIZÍ</b> (Fahr! Lauf!). U sprechen/geben/nehmen e→i <b>zůstává</b> (Sprich! Gib! Nimm!). Imperativ <b>ihr</b> = tvar přít. času bez zájmena (Sagt! Macht!)." },
+  interrog:   { label: "Tázací zájmena (welch-/wessen)", tip: "<b>welch-</b> se skloňuje jako určitý člen: welches Buch (n.), welchen Mann (m. ak.), welcher Frau (f. dat.). <b>Wessen?</b> = Čí? — nemění se podle rodu." },
+  datum:      { label: "Datum (Heute haben wir den ...)", tip: "Po „Heute/Morgen haben wir...“ je datum v <b>AKUZATIVU s členem den</b>: den ersten/zweiten/dritten… vierundzwanzigsten Mai." },
+  adjEnd:     { label: "Adjektivní koncovky", tip: "Klíč: 1) <b>der-slovo</b> (der/die/das, dieser, jeder…) → slabé skloňování (-e/-en). 2) <b>ein-slovo</b> (ein, mein, kein…) → smíšené (signál vyjadřuje koncovka adj.). 3) <b>BEZ členu</b> → silné (koncovka jako u členu). V <b>dativu/genitivu po der-slově je VŽDY -en</b>." },
+  wohinWo:    { label: "Wohin (akuzativ) vs Wo (dativ)", tip: "<b>Wohin?</b> = kam? → <b>AKUZATIV</b> (in den Tisch, ins Schlafzimmer). <b>Wo?</b> = kde? → <b>DATIV</b> (in dem Tisch, im Schlafzimmer). Týká se in/an/auf/über/unter/vor/hinter/neben/zwischen." },
+  modal:      { label: "Modální slovesa + infinitiv", tip: "Modální (wollen/können/müssen/sollen/möchten) je na 2. místě, <b>infinitiv úplně NA KONCI</b> věty. Odlučitelné předpony zůstávají u infinitivu (anbieten, ablegen, vorstellen)." },
+  subord:     { label: "Vedlejší věta — sloveso na konci", tip: "Po spojkách <b>dass, ob, weil, wenn, obwohl, warum</b> jde určité sloveso <b>NA ÚPLNÝ KONEC</b>. Pokud je tam modální sloveso, je <b>až za infinitivem</b> (… arbeiten müssen, … kommen muss)." },
+  inversion:  { label: "Inverze po vedlejší větě", tip: "Když věta začíná vedlejší větou (Wenn ich Schmerzen habe, …), v hlavní větě je <b>INVERZE</b> — sloveso na 1. místě, podmět za ním (… gehe ich zum Arzt)." },
+  negation:   { label: "nicht vs kein, jed-", tip: "<b>kein-</b> popírá podstatné jméno s neurčitým / žádným členem (kein Reis, keine Zeit). <b>nicht</b> popírá sloveso/větu/část. Po „ist/sind/haben“ + nominativ/akuzativ bez členu vyber <b>kein</b>. <b>jed-</b> má koncovky jako určitý člen (jeder Mann, jedes Auto, jede Frau)." },
+  reflexive:  { label: "Reflexivní zájmena (mir/mich, dir/dich)", tip: "Pokud sloveso řídí <b>akuzativ</b> (interessieren für, freuen über) → <b>mich, dich, sich</b>. S částí těla nebo s druhým předmětem → <b>DATIV</b> (Ich wasche <b>mir</b> die Hände — myju <b>si</b> ruce)." },
+  separable:  { label: "Odlučitelné předpony", tip: "V přítomném čase odlučitelná předpona jde <b>NA KONEC</b> věty (legt … ab, bietet … an). V infinitivu / po modálním <b>zůstává spojená</b> (ablegen, anbieten, vorstellen)." },
+  comparison: { label: "Komparativ a superlativ", tip: "Po komparativu vždy <b>als</b> (jünger als ich). Pro stejné srovnání <b>so … wie</b> (so gut wie ich). Superlativ příslovce: <b>am …sten</b> (am schnellsten, am spätesten). Superlativ adjektiva: der/die/das + …ste + koncovka." },
+  prepCase:   { label: "Předložky s pevným pádem", tip: "<b>DATIV</b>: aus, bei, mit, nach, seit, von, zu, gegenüber. <b>AKUZATIV</b>: durch, für, gegen, ohne, um. „<b>wissen/erzählen von + dativ</b>“ = vědět/vyprávět o kom/čem. <b>nach + DATIV</b> (nach der neuesten Mode)." },
+  pronoun:    { label: "Zástupná zájmena (eins/einen)", tip: "Když nahrazujeme „ein/eine/ein + substantivum“ samotným zájmenem, ein dostává <b>koncovku členu</b>: masc. nom. <b>einer</b>, masc. ak. <b>einen</b>, fem. <b>eine</b>, neutr. <b>eins</b> (NE „ein“!)." },
+  verbColloc: { label: "Vazby slovesa", tip: "<b>gern + sloveso</b> = rád dělat něco (gern kommen, gern lesen). <b>jdm. stehen</b> = slušet komu (+ DATIV): Die Bluse steht <b>Ihnen</b>. <b>jdm. gefallen</b> = líbit se komu (+ DATIV)." },
+};
 
 const ENCOURAGE_OK = ["Skvělé! 🎉", "Výborně! ⚡", "Trefa! 🎯", "Bomba! 💪", "Tak se to dělá! 👏", "Pokračuj! 🔥", "Bingo! ✨", "Tohle máš! 🌟"];
 const ENCOURAGE_BAD = ["Nevadí — vrátí se brzy. 💪", "Tohle je oříšek. Zapamatuj si vzor. 🌰", "Příště lépe! 📚", "Dáš to, jen klid. 😌", "Zkus si to projít znovu. 🔄"];
@@ -956,6 +1000,7 @@ function vibrate(pattern) { if (navigator.vibrate) try { navigator.vibrate(patte
 function buildDrillDeck(mode = "all") {
   drillMode = mode;
   drillSessionMax = null;
+  drillSessionWrong = [];
 
   let pool = PAST_TESTS.map((_, i) => i);
   if (mode === "A") pool = pool.filter(i => PAST_TESTS[i].v === "A");
@@ -965,6 +1010,17 @@ function buildDrillDeck(mode = "all") {
   else if (mode === "2024") pool = pool.filter(i => PAST_TESTS[i].v === "A" || PAST_TESTS[i].v === "B");
   else if (mode === "2023") pool = pool.filter(i => PAST_TESTS[i].v === "A23" || PAST_TESTS[i].v === "B23");
   else if (mode === "review") pool = pool.filter(i => state.drill.mastered[drillKey(PAST_TESTS[i])]);
+  else if (mode === "exam2024") {
+    // Cvičný test: 60 otázek LS 2024/2025 v pevném pořadí (A1–30, B1–30), single pass
+    const aPool = pool.filter(i => PAST_TESTS[i].v === "A").sort((x,y) => PAST_TESTS[x].n - PAST_TESTS[y].n);
+    const bPool = pool.filter(i => PAST_TESTS[i].v === "B").sort((x,y) => PAST_TESTS[x].n - PAST_TESTS[y].n);
+    drillPDeck = aPool.concat(bPool);
+    drillSessionMax = drillPDeck.length;
+    drillPI = 0;
+    drillAnswered = false;
+    drillSessionStats = { correct: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
+    return;
+  }
   else if (mode === "quick") {
     // Rychlá session: 10 otázek, prioritně nezvládnuté + pár review
     const fresh = shuffle(pool.filter(i => !state.drill.mastered[drillKey(PAST_TESTS[i])]));
@@ -1009,6 +1065,7 @@ function renderDrill() {
 
       <div class="drill-mode-stack">
         <button class="primary drill-cta" data-mode="quick">⚡ Rychlá session <span class="drill-cta-sub">10 otázek · ~3 min</span></button>
+        <button class="primary drill-cta" data-mode="exam2024" style="background:var(--accent-2); box-shadow:0 4px 0 var(--accent-2-shade)">📝 Cvičný test 2024/2025 <span class="drill-cta-sub">60 otázek · % skóre + tipy na konci</span></button>
         <button class="primary drill-cta drill-cta-secondary" data-mode="all">🎯 Pokračovat (Všech 119)</button>
         ${masteredCount ? `<button class="ghost drill-cta" data-mode="review">📖 Review zvládnutých (${masteredCount})</button>` : ''}
       </div>
@@ -1054,32 +1111,103 @@ function renderDrill() {
     const total = drillSessionStats.correct + drillSessionStats.wrong;
     const pct = total ? Math.round(drillSessionStats.correct / total * 100) : 0;
     const isQuick = drillMode === "quick";
+    const isExam = drillMode === "exam2024";
     let cheer = "🎉 Skvělá práce!";
-    if (pct >= 90) cheer = "🏆 Bomba! Tohle máš ve fingrech.";
-    else if (pct >= 70) cheer = "🔥 Dobrá session — pokračuj!";
-    else if (pct >= 50) cheer = "💪 Slušné — ještě jeden kolo a bude to.";
-    else cheer = "📚 Hlavně se nedej. Tyhle se brzy vrátí.";
+    if (isExam) {
+      if (pct >= 90) cheer = "🏆 Skvělé! Na zkoušku jsi připraven/a.";
+      else if (pct >= 75) cheer = "🔥 Dobrý výkon — pár oblastí ještě dotáhni.";
+      else if (pct >= 60) cheer = "💪 Slušné, ale je nad čím pracovat.";
+      else if (pct >= 40) cheer = "📚 Chce to ještě drillovat — zaměř se na témata níže.";
+      else cheer = "⚠️ Tohle bude potřebovat víc tréninku. Projdi si tipy a dej druhý pokus.";
+    } else {
+      if (pct >= 90) cheer = "🏆 Bomba! Tohle máš ve fingrech.";
+      else if (pct >= 70) cheer = "🔥 Dobrá session — pokračuj!";
+      else if (pct >= 50) cheer = "💪 Slušné — ještě jeden kolo a bude to.";
+      else cheer = "📚 Hlavně se nedej. Tyhle se brzy vrátí.";
+    }
+
+    // Pro cvičný test: agregace chyb podle tématu
+    let watchOutHtml = "";
+    if (isExam) {
+      const topicCounts = {};       // topic -> count
+      const topicQuestions = {};    // topic -> [{q, chosen, correct}]
+      const noTopic = [];
+      drillSessionWrong.forEach(w => {
+        const t = LS2024_TOPICS[w.key];
+        if (t) {
+          topicCounts[t] = (topicCounts[t] || 0) + 1;
+          (topicQuestions[t] = topicQuestions[t] || []).push(w);
+        } else {
+          noTopic.push(w);
+        }
+      });
+      const sortedTopics = Object.keys(topicCounts).sort((a,b) => topicCounts[b] - topicCounts[a]);
+
+      if (drillSessionWrong.length === 0) {
+        watchOutHtml = `
+          <div class="card" style="margin-top:18px; border-left:4px solid var(--ok)">
+            <h3 style="margin:0 0 8px; color:var(--ok)">🎯 Bez chyb!</h3>
+            <p style="margin:0; color:var(--muted)">Žádná otázka špatně — gramatiku máš zvládnutou. Můžeš jít na ostro.</p>
+          </div>
+        `;
+      } else {
+        watchOutHtml = `
+          <div class="card" style="margin-top:18px; border-left:4px solid var(--accent-2)">
+            <h3 style="margin:0 0 4px">⚠️ Na co si dát pozor</h3>
+            <p style="margin:0 0 14px; color:var(--muted); font-size:13px">Témata seřazena podle počtu chyb. Klikni na téma pro rozbalení tipu a všech tvých chyb.</p>
+            ${sortedTopics.map(t => {
+              const tip = TOPIC_TIPS[t] || { label: t, tip: "" };
+              const items = topicQuestions[t];
+              return `
+                <details class="watchout-topic" style="margin-bottom:8px; border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:var(--bg)">
+                  <summary style="cursor:pointer; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px">
+                    <span>${tip.label}</span>
+                    <span style="background:var(--err); color:#fff; padding:2px 10px; border-radius:12px; font-size:12px">${topicCounts[t]}× chyba</span>
+                  </summary>
+                  <div style="margin-top:10px; padding:10px 12px; background:#FFF8EC; border-left:3px solid var(--gold-shade); border-radius:6px; font-size:14px; line-height:1.5">
+                    <b>💡 Pravidlo:</b> ${tip.tip}
+                  </div>
+                  <div style="margin-top:10px">
+                    ${items.map(w => `
+                      <div style="padding:8px 10px; margin-bottom:6px; background:#FFEEEE; border-radius:6px; font-size:13px">
+                        <div style="color:var(--muted); font-size:11px; margin-bottom:2px">Varianta ${w.q.v} · Otázka ${w.q.n}</div>
+                        <div style="margin-bottom:4px">${w.q.q.replace("______", `<mark style="background:#FFD7D7; padding:1px 4px; border-radius:3px">______</mark>`)}</div>
+                        <div style="font-size:12px"><span style="color:var(--err)">Tvoje:</span> <s>${w.chosen}</s> &nbsp; <span style="color:var(--ok)">Správně:</span> <b>${w.correct === "0" ? "(prázdné)" : w.correct}</b></div>
+                        ${w.q.cz ? `<div style="font-size:12px; color:var(--muted); margin-top:3px">🇨🇿 ${w.q.cz}</div>` : ''}
+                      </div>
+                    `).join("")}
+                  </div>
+                </details>
+              `;
+            }).join("")}
+            ${noTopic.length ? `<div style="font-size:12px; color:var(--muted); margin-top:8px">+ ${noTopic.length} dalších chyb bez kategorie</div>` : ''}
+          </div>
+        `;
+      }
+    }
 
     app.innerHTML = `
       <div class="drill-end">
-        <h2 style="text-align:center; margin-bottom:8px">${isQuick ? "⚡ Rychlá session hotová" : "🎉 Session dokončena"}</h2>
+        <h2 style="text-align:center; margin-bottom:8px">${isExam ? "📝 Cvičný test 2024/2025 hotový" : isQuick ? "⚡ Rychlá session hotová" : "🎉 Session dokončena"}</h2>
         <p style="text-align:center; color:var(--muted); margin:0 0 18px; font-size:15px">${cheer}</p>
 
         <div class="drill-end-score">
           <div class="drill-end-num" style="color:${pct>=70?'var(--ok)':pct>=50?'var(--gold-shade)':'var(--err)'}">${pct} %</div>
-          <div class="drill-end-lbl">přesnost session</div>
+          <div class="drill-end-lbl">${isExam ? "přesnost cvičného testu" : "přesnost session"}</div>
         </div>
 
         <div class="card">
           <div class="stat"><span>✅ Správně</span><b style="color:var(--ok)">${drillSessionStats.correct}</b></div>
           <div class="stat"><span>❌ Špatně</span><b style="color:var(--err)">${drillSessionStats.wrong}</b></div>
           <div class="stat"><span>🔥 Nejlepší řetězec</span><b>${drillSessionStats.bestStreak}</b></div>
-          <div class="stat"><span>🏆 Zvládnuté celkem</span><b>${masteredCount} / ${totalCount}</b></div>
-          <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>
+          ${isExam ? '' : `<div class="stat"><span>🏆 Zvládnuté celkem</span><b>${masteredCount} / ${totalCount}</b></div>
+          <div class="bar"><div class="bar-fill" style="width:${totalCount?masteredCount/totalCount*100:0}%"></div></div>`}
         </div>
 
+        ${watchOutHtml}
+
         <div class="drill-actions-stack">
-          <button class="primary drill-cta" id="drillAgain">🔁 Další session</button>
+          <button class="primary drill-cta" id="drillAgain">🔁 ${isExam ? "Znovu cvičný test" : "Další session"}</button>
           <button class="ghost drill-cta" id="drillBack">← Zpět na výběr</button>
         </div>
       </div>
@@ -1124,7 +1252,7 @@ function renderDrill() {
   const modeLabels = {
     all: "Všech 119", "2024": "Ročník 2024", "2023": "Ročník 2023",
     A: "Varianta A", B: "Varianta B", A23: "Varianta A23", B23: "Varianta B23",
-    review: "Review", quick: "Rychlá session"
+    review: "Review", quick: "Rychlá session", exam2024: "📝 Cvičný test 2024/25"
   };
   const modeLabel = modeLabels[drillMode] || drillMode;
 
@@ -1163,7 +1291,7 @@ function renderDrill() {
 
       <div class="drill-actions" id="drillActions">
         <button class="ghost drill-back-btn" id="drillBack">← Zpět</button>
-        <button class="ghost drill-skip-btn" id="drillSkip">Přeskočit</button>
+        ${drillMode === "exam2024" ? '' : '<button class="ghost drill-skip-btn" id="drillSkip">Přeskočit</button>'}
         <button class="primary drill-next-btn" id="drillNext" style="display:none">Další →</button>
       </div>
     </div>
@@ -1171,7 +1299,8 @@ function renderDrill() {
 
   app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => answerDrill(parseInt(b.dataset.i))));
   document.getElementById("drillBack").addEventListener("click", () => { drillPDeck = []; renderDrill(); });
-  document.getElementById("drillSkip").addEventListener("click", () => { drillPI++; drillAnswered = false; renderDrill(); });
+  const skipBtn = document.getElementById("drillSkip");
+  if (skipBtn) skipBtn.addEventListener("click", () => { drillPI++; drillAnswered = false; renderDrill(); });
   document.getElementById("drillNext").addEventListener("click", nextDrill);
 }
 
@@ -1192,6 +1321,7 @@ function answerDrill(i) {
   });
 
   state.drill.attempts++;
+  const isExam = drillMode === "exam2024";
   if (ok) {
     state.drill.correct++;
     drillSessionStats.correct++;
@@ -1200,27 +1330,33 @@ function answerDrill(i) {
       drillSessionStats.bestStreak = drillSessionStats.currentStreak;
     }
     vibrate(30);  // krátká kladná vibrace
-    const newStreak = (state.drill.streaks[key] || 0) + 1;
-    state.drill.streaks[key] = newStreak;
-    if (newStreak >= 2) {
-      state.drill.mastered[key] = true;
-      drillPDeck.splice(drillPI, 1);
-      drillPI--;
-    } else {
-      drillPDeck.splice(drillPI, 1);
-      const insertAt = Math.min(drillPDeck.length, drillPI + 8 + Math.floor(Math.random()*5));
-      drillPDeck.splice(insertAt, 0, qIdx);
-      drillPI--;
+    if (!isExam) {
+      const newStreak = (state.drill.streaks[key] || 0) + 1;
+      state.drill.streaks[key] = newStreak;
+      if (newStreak >= 2) {
+        state.drill.mastered[key] = true;
+        drillPDeck.splice(drillPI, 1);
+        drillPI--;
+      } else {
+        drillPDeck.splice(drillPI, 1);
+        const insertAt = Math.min(drillPDeck.length, drillPI + 8 + Math.floor(Math.random()*5));
+        drillPDeck.splice(insertAt, 0, qIdx);
+        drillPI--;
+      }
     }
   } else {
     drillSessionStats.wrong++;
     drillSessionStats.currentStreak = 0;
     vibrate([60, 40, 60]);  // delší "wrong" pattern
-    state.drill.streaks[key] = 0;
-    drillPDeck.splice(drillPI, 1);
-    const insertAt = Math.min(drillPDeck.length, drillPI + 2 + Math.floor(Math.random()*3));
-    drillPDeck.splice(insertAt, 0, qIdx);
-    drillPI--;
+    if (isExam) {
+      drillSessionWrong.push({ key, q, chosen: chosen.text, correct: q.opts[q.a] });
+    } else {
+      state.drill.streaks[key] = 0;
+      drillPDeck.splice(drillPI, 1);
+      const insertAt = Math.min(drillPDeck.length, drillPI + 2 + Math.floor(Math.random()*3));
+      drillPDeck.splice(insertAt, 0, qIdx);
+      drillPI--;
+    }
   }
   save();
 
@@ -1266,7 +1402,8 @@ function answerDrill(i) {
   nextBtn.focus();
 
   // Auto-advance na správné odpovědi (1.2s) — uživatel může klepnout Další pro okamžitý přechod
-  if (ok) {
+  // V cvičném testu auto-advance vypneme, aby si user stihl přečíst vysvětlení
+  if (ok && !isExam) {
     nextBtn.classList.add("drill-next-auto");
     nextBtn.innerHTML = 'Další → <span class="drill-auto-bar"></span>';
     drillAutoTimer = setTimeout(() => {
