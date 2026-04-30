@@ -35,6 +35,7 @@ function render(view) {
     case "test": return renderTest();
     case "drill": return renderDrill();
     case "oral": return renderOral();
+    case "prepa1": return renderPrepA1();
     case "progress": return renderProgress();
   }
 }
@@ -95,6 +96,7 @@ function renderHome() {
       <div class="tile" data-go="test" style="border-color:var(--accent)"><h3>🎓 Zápočet (START ZDE)</h3><small>Principy testu, vzorový test, drilly, popis obrázků, simulace. <b>Nejdůležitější sekce.</b></small></div>
       <div class="tile" data-go="drill" style="border-color:var(--accent-2)"><h3>🔥 Drill minulých testů</h3><small><b>119 reálných otázek</b> ze 4 zápočtových testů (ročníky 2023 + 2024, varianty A/B). Spaced repetition — naučíš se je nazpaměť. <b>Klikačka!</b></small></div>
       <div class="tile" data-go="oral" style="border-color:var(--blue)"><h3>🗣️ Ústní zkouška</h3><small><b>7 témat</b> s větami nazpaměť (O sobě, Práce, Apple, Týden, Rodina, Dovolená, Volný čas). Výslovnost přes 🔊, trénink CZ→DE.</small></div>
+      <div class="tile" data-go="prepa1" style="border-color:var(--gold)"><h3>📝 A1 Otázky a odpovědi</h3><small><b>11 témat</b> v Q&A stylu — představení, cestování, jídlo, počasí, rodina… Slovní zásoba + tipy na gramatiku.</small></div>
       <div class="tile" data-go="grammar"><h3>📖 Gramatika</h3><small>10 týdnů: Perfektum, modálky v préteritu, imperativ, spojky ADUSO, lokální předložky…</small></div>
       <div class="tile" data-go="vocab"><h3>📚 Slovíčka</h3><small>5 lekcí, ${total} slov po kategoriích. Hledání + označování naučených.</small></div>
       <div class="tile" data-go="flashcards"><h3>🃏 Kartičky</h3><small>CZ↔DE, výběr lekce, klávesové zkratky (mezerník otočí, šipky posouvají).</small></div>
@@ -725,6 +727,159 @@ function renderSimStep(body, task, itemIdx, progress, taskProgress, q, model, au
   document.getElementById("simSubmit").addEventListener("click", submit);
   document.getElementById("simSkip").addEventListener("click", () => { simI++; renderTest(); });
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey && rows === 2)) { e.preventDefault(); submit(); } });
+}
+
+// ==== A1 OTÁZKY (Q&A z dokumentu „Nemcina zkouska priprava") ====
+function renderPrepA1() {
+  const app = document.getElementById("app");
+  const data = EXAM_PREP_A1;
+
+  const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+  const speakBtn = (text, label = "🔊") =>
+    `<button class="prep-speak" data-de="${escapeHtml(text)}" title="Přehrát německy">${label}</button>`;
+
+  const sentenceRow = ([de, cz]) => `
+    <div class="prep-sent">
+      <div class="prep-sent-de">${escapeHtml(de)}</div>
+      <div class="prep-sent-cz">${escapeHtml(cz)}</div>
+      ${speakBtn(de)}
+    </div>`;
+
+  const vocabTable = (title, rows) => rows && rows.length ? `
+    <div class="prep-vocab">
+      <div class="prep-vocab-title">${escapeHtml(title)}</div>
+      <div class="prep-vocab-list">
+        ${rows.map(([de, cz]) => `
+          <div class="prep-vocab-row">
+            <div class="prep-vocab-de">${escapeHtml(de)}</div>
+            <div class="prep-vocab-cz">${escapeHtml(cz)}</div>
+            ${speakBtn(de.replace(/^(der|die|das)\s+/, "").split(" / ")[0])}
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+
+  const tipBox = tip => tip ? `<div class="prep-tip">💡 ${escapeHtml(tip)}</div>` : "";
+
+  const qaBlock = qa => `
+    <div class="prep-qa">
+      <div class="prep-q">
+        <span class="prep-q-mark">❓</span>
+        <div class="prep-q-text">
+          <div class="prep-q-de">${escapeHtml(qa.q)}</div>
+          <div class="prep-q-cz">🇨🇿 ${escapeHtml(qa.qcz)}</div>
+        </div>
+        ${speakBtn(qa.q)}
+      </div>
+      <div class="prep-a">
+        ${qa.answers.map(([de, cz]) => `
+          <div class="prep-a-row">
+            <div class="prep-a-arrow">→</div>
+            <div class="prep-a-text">
+              <div class="prep-a-de">${escapeHtml(de)}</div>
+              <div class="prep-a-cz">${escapeHtml(cz)}</div>
+            </div>
+            ${speakBtn(de)}
+          </div>`).join("")}
+      </div>
+      ${tipBox(qa.tip)}
+    </div>`;
+
+  const conjBlock = c => !c ? "" : `
+    <div class="prep-conj">
+      <div class="prep-conj-title">Příklad: ${escapeHtml(c.verb)} (${escapeHtml(c.cz)})</div>
+      <div class="prep-vocab-list">
+        ${c.forms.map(([de, cz]) => `
+          <div class="prep-vocab-row">
+            <div class="prep-vocab-de">${escapeHtml(de)}</div>
+            <div class="prep-vocab-cz">${escapeHtml(cz)}</div>
+            ${speakBtn(de.replace(/^(er \/ sie \/ es|sie \/ Sie)\s+/, ""))}
+          </div>`).join("")}
+      </div>
+    </div>`;
+
+  const topicCard = (t, idx) => `
+    <details class="prep-topic" ${idx === 0 ? "open" : ""}>
+      <summary class="prep-topic-head">
+        <span class="prep-topic-emoji">${t.emoji}</span>
+        <span class="prep-topic-title">${idx + 1}. ${escapeHtml(t.title)}</span>
+        <span class="prep-topic-de">(${escapeHtml(t.de)})</span>
+      </summary>
+      <div class="prep-topic-body">
+        ${conjBlock(t.conjugation)}
+        ${(t.qas || []).map(qaBlock).join("")}
+        ${vocabTable("📋 Slovní zásoba", t.vocab)}
+        ${vocabTable("📋 " + (t.vocab2Title || ""), t.vocab2)}
+        ${vocabTable(t.vocab3Title || "", t.vocab3)}
+        ${tipBox(t.tip)}
+      </div>
+    </details>`;
+
+  app.innerHTML = `
+    <div class="prep-wrap">
+      <div class="card prep-intro">
+        <h2>📝 ${escapeHtml(data.intro.title)}</h2>
+        <div class="prep-sub">${escapeHtml(data.intro.subtitle)}</div>
+        <div class="prep-person">${escapeHtml(data.intro.person)}</div>
+      </div>
+
+      <div class="card prep-greeting">
+        <h3>⭐ Hotové představení na začátek zkoušky</h3>
+        <div class="prep-greeting-hint">Tohle se nauč zpaměti — můžeš tím začít zkoušku:</div>
+        <div class="prep-greeting-list">
+          ${data.greeting.map(sentenceRow).join("")}
+        </div>
+        <button class="btn-primary prep-play-all" id="prepPlayAll">🔊 Přehrát celý úvod</button>
+      </div>
+
+      <h3 class="prep-section-h">Témata — otázky a odpovědi</h3>
+      <div class="prep-topics">
+        ${data.topics.map((t, i) => topicCard(t, i)).join("")}
+      </div>
+
+      <div class="card prep-tips">
+        <h3>💡 Tipy na učení</h3>
+        <ul>
+          ${data.tips.map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+        </ul>
+        <div class="prep-final">Hodně štěstí! 🍀 Viel Glück!</div>
+      </div>
+    </div>
+  `;
+
+  app.querySelectorAll(".prep-speak").forEach(b => {
+    b.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const text = b.getAttribute("data-de");
+      if (text) speak(text, "de-DE");
+    });
+  });
+
+  const playAll = document.getElementById("prepPlayAll");
+  if (playAll) {
+    let aborted = false;
+    playAll.addEventListener("click", async () => {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      aborted = false;
+      playAll.disabled = true;
+      playAll.textContent = "⏳ Přehrávám…";
+      const sentences = data.greeting.map(([de]) => de);
+      for (const s of sentences) {
+        if (aborted) break;
+        await new Promise(resolve => {
+          const u = new SpeechSynthesisUtterance(s);
+          u.lang = "de-DE"; u.rate = 0.9;
+          u.onend = resolve;
+          u.onerror = resolve;
+          window.speechSynthesis.speak(u);
+        });
+      }
+      playAll.disabled = false;
+      playAll.textContent = "🔊 Přehrát celý úvod";
+    });
+  }
 }
 
 // ==== PROGRESS ====

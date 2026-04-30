@@ -1325,3 +1325,193 @@ footer small {
 .oral-train-cta { flex: 1 1 200px; padding: 14px 18px !important; font-size: 14px !important; }
 .oral-train-skip { flex: 0 1 auto; padding: 12px 14px !important; font-size: 13px !important; }
 
+/* ==========================================================================
+   A1 PREP — Q&A z dokumentu „Nemcina zkouska priprava"
+   ========================================================================== */
+.prep-wrap { display: flex; flex-direction: column; gap: 16px; }
+
+.prep-intro {
+  background: linear-gradient(135deg, var(--gold) 0%, #FFE066 100%);
+  color: #3C2B00;
+  border-color: var(--gold-shade);
+}
+.prep-intro h2 { margin: 0 0 6px; font-family: var(--font-display); }
+.prep-sub { font-size: 15px; font-weight: 700; opacity: 0.85; }
+.prep-person { font-size: 13px; font-weight: 600; opacity: 0.7; margin-top: 4px; }
+
+.prep-greeting { border-color: var(--blue); }
+.prep-greeting h3 { margin: 0 0 4px; color: var(--blue-shade); }
+.prep-greeting-hint { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.prep-greeting-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+.prep-sent {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--blue-tint);
+  padding: 10px 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--blue);
+}
+.prep-sent-de { flex: 1 1 50%; font-weight: 800; color: var(--strong); font-size: 15px; }
+.prep-sent-cz { flex: 1 1 45%; font-weight: 600; color: var(--text); font-size: 13px; }
+
+.prep-play-all {
+  width: 100%;
+  background: var(--blue);
+  color: #fff;
+  border: 0;
+  padding: 12px;
+  border-radius: var(--r);
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+}
+.prep-play-all:hover { background: var(--blue-shade); }
+.prep-play-all:disabled { opacity: 0.6; cursor: wait; }
+
+.prep-section-h {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  color: var(--strong);
+}
+
+.prep-topics { display: flex; flex-direction: column; gap: 10px; }
+
+.prep-topic {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.prep-topic[open] { border-color: var(--accent); }
+
+.prep-topic-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-weight: 800;
+}
+.prep-topic-head::-webkit-details-marker { display: none; }
+.prep-topic-head::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.prep-topic[open] .prep-topic-head::after { transform: rotate(180deg); }
+
+.prep-topic-emoji { font-size: 24px; }
+.prep-topic-title { color: var(--strong); font-size: 16px; }
+.prep-topic-de { color: var(--muted); font-size: 13px; font-weight: 600; }
+
+.prep-topic-body {
+  padding: 0 16px 16px;
+  display: flex; flex-direction: column; gap: 14px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 14px;
+}
+
+.prep-qa {
+  background: var(--bg-soft);
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+.prep-q { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.prep-q-mark { font-size: 18px; line-height: 1.4; }
+.prep-q-text { flex: 1; min-width: 0; }
+.prep-q-de { font-weight: 800; color: var(--strong); font-size: 15px; }
+.prep-q-cz { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+
+.prep-a { display: flex; flex-direction: column; gap: 6px; padding-left: 28px; }
+.prep-a-row {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--accent-tint);
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent);
+}
+.prep-a-arrow { color: var(--accent-shade); font-weight: 900; }
+.prep-a-text { flex: 1; min-width: 0; }
+.prep-a-de { font-weight: 800; color: var(--strong); font-size: 14px; }
+.prep-a-cz { font-size: 12px; color: var(--text); font-weight: 600; margin-top: 2px; }
+
+.prep-vocab {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.prep-vocab-title { font-weight: 800; margin-bottom: 8px; color: var(--strong); }
+.prep-vocab-list { display: flex; flex-direction: column; gap: 4px; }
+.prep-vocab-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+}
+.prep-vocab-de { flex: 1 1 50%; font-weight: 700; color: var(--strong); font-size: 14px; }
+.prep-vocab-cz { flex: 1 1 45%; font-size: 13px; color: var(--text); font-weight: 600; }
+
+.prep-conj {
+  background: var(--blue-tint);
+  border: 1px solid var(--blue);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.prep-conj-title { font-weight: 800; color: var(--blue-shade); margin-bottom: 8px; }
+
+.prep-tip {
+  background: #FFF7D6;
+  border: 1px solid var(--gold);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #5A4500;
+  font-weight: 600;
+}
+
+.prep-speak {
+  flex: 0 0 auto;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.prep-speak:hover {
+  background: var(--blue);
+  border-color: var(--blue);
+  transform: scale(1.05);
+}
+
+.prep-tips ul { margin: 0; padding-left: 20px; }
+.prep-tips li { margin-bottom: 6px; font-size: 14px; }
+.prep-final {
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--accent-tint);
+  border-radius: var(--r);
+  text-align: center;
+  font-weight: 800;
+  color: var(--accent-shade);
+}
+
+@media (max-width: 600px) {
+  .prep-sent { flex-wrap: wrap; }
+  .prep-sent-de, .prep-sent-cz { flex: 1 1 100%; }
+  .prep-vocab-row { flex-wrap: wrap; }
+  .prep-vocab-de, .prep-vocab-cz { flex: 1 1 100%; }
+  .prep-a { padding-left: 12px; }
+  .prep-topic-head { flex-wrap: wrap; }
+  .prep-topic-de { flex: 1 1 100%; padding-left: 34px; }
+}
+
